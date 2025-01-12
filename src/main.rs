@@ -1,5 +1,4 @@
 #![feature(iter_map_windows)]
-use std::collections::VecDeque;
 use std::io;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -9,12 +8,11 @@ enum Structure {
     Load(f64),
     Line(f64),
 }
-fn input_generation() -> VecDeque<Structure> {
+
+fn input_generation() -> Vec<Structure> {
     let mut input = String::new();
     clearscreen();
-    println!(
-        "Hello! This is the Butterworth Filter Designer. Please input your filter's order: (1-10)"
-    );
+    println!("Hello! This is the Butterworth Filter Designer. Please input your filter's order: (1-10)");
 
     io::stdin()
         .read_line(&mut input)
@@ -30,33 +28,33 @@ fn input_generation() -> VecDeque<Structure> {
         panic!();
     }
 
-    let table: [[f64; 11]; 10] = [
-        [2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
-        [1.4142, 1.4142, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
-        [1.0, 2.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
-        [0.7654, 1.8478, 1.8478, 0.7654, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
-        [0.618, 1.618, 2.0, 1.618, 0.618, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
-        [0.5176, 1.4142, 1.9318, 1.9318, 1.4142, 0.5176, 1.0, 0.0, 0.0, 0.0, 0.0],
-        [0.445, 1.247, 1.8019, 2.0, 1.8019, 1.247, 0.445, 1.0, 0.0, 0.0, 0.0], 
-        [0.3902, 1.111, 1.6629, 1.9615, 1.9615, 1.6629, 1.111, 0.39, 1.0, 0.0, 0.0], 
-        [0.3473, 1.0, 1.5321, 1.8794, 2.0, 1.8794, 1.5321, 1.0, 0.3473, 1.0, 0.0], 
-        [0.3129, 0.908, 1.4142, 1.782, 1.9754, 1.9754, 1.7820, 1.4142, 0.9080, 0.3129, 0.0], 
+    const TABLE: &[&[f64]] = &[
+        &[2.0000, 1.0000],
+        &[1.4142, 1.4142, 1.0000],
+        &[1.0000, 2.0000, 1.0000, 1.0000],
+        &[0.7654, 1.8478, 1.8478, 0.7654, 1.0000],
+        &[0.6180, 1.6180, 2.0000, 1.6180, 0.6180, 1.0000],
+        &[0.5176, 1.4142, 1.9318, 1.9318, 1.4142, 0.5176, 1.0000],
+        &[0.4450, 1.2470, 1.8019, 2.0000, 1.8019, 1.2470, 0.4450, 1.0000],
+        &[0.3902, 1.1110, 1.6629, 1.9615, 1.9615, 1.6629, 1.1110, 0.3900, 1.0000],
+        &[
+            0.3473, 1.0000, 1.5321, 1.8794, 2.0000, 1.8794, 1.5321, 1.0000, 0.3473, 1.0000,
+        ],
+        &[
+            0.3129, 0.9080, 1.4142, 1.7820, 1.9754, 1.9754, 1.7820, 1.4142, 0.9080, 0.3129, 1.0000,
+        ],
     ];
 
-    let selected_row = &table[number - 1];
+    let selected_row = TABLE[number - 1];
 
-    let mut structures = VecDeque::new();
+    let mut structures = Vec::new();
     for (i, &value) in selected_row.iter().enumerate() {
-        if value == 0.0 {
-            break;
-        }
-        if i % 2 == 0 && i != number  {
-            structures.push_back(Structure::Series(value));
-        } else if i % 2 != 0 && i != number  {
-            structures.push_back(Structure::Shunt(1.0/value));
-        }
-        else {
-            structures.push_back(Structure::Load(value));
+        if i % 2 == 0 && i != number {
+            structures.push(Structure::Series(value));
+        } else if i % 2 != 0 && i != number {
+            structures.push(Structure::Shunt(1.0 / value));
+        } else {
+            structures.push(Structure::Load(value));
         }
     }
 
@@ -66,7 +64,7 @@ fn input_generation() -> VecDeque<Structure> {
             Structure::Series(value) => println!("g{}: Series({:.4})", i + 1, value),
             Structure::Shunt(value) => println!("g{}: Shunt({:.4})", i + 1, value),
             Structure::Load(value) => println!("g{}: Load({:.4})", i + 1, value),
-            Structure::Line(_) => println!("Unexpected line"),
+            Structure::Line(_) => unreachable!("Unexpected line"),
         }
     }
     structures
@@ -75,41 +73,38 @@ fn main() {
     let src_impedance: f64 = 50.0;
 
     let mut input = input_generation();
-    input.pop_back();
-    transform_structure(&mut input, src_impedance).expect("F");
+    input.pop();
+    let mut transformed = transform_structure(&input, src_impedance).expect("F");
     println!("\n The normalised characteristic impedence of the lines are as follows:\n");
-    println!("{:.4?}", input);
+    println!("{:.4?}", transformed);
     println!("\n The actual characteristic impedence of the lines are as follows:\n");
-    let mut new_input = Vec::new();
-    for i in input {
-        match i {
-            Structure::Shunt(v) => new_input.push(Structure::Shunt(v*50.0)),
-            Structure::Line(v) => new_input.push(Structure::Line(v*50.0)),
-            _ => println!("Unexpected value"),
+    for structure in transformed.iter_mut() {
+        match structure {
+            Structure::Shunt(v) => *v *= 50.0,
+            Structure::Line(v) => *v *= 50.0,
+            _ => panic!("Unexpected value"),
         }
     }
-    println!("{:.4?}", new_input)
+    println!("{:.4?}", transformed);
 }
-
-
 
 fn process_pair(a: Structure, b: Structure) -> (Structure, Structure) {
     match (a, b) {
         (Structure::Line(a), Structure::Series(b)) => {
-            let n : f64 = 1.0 + a/b;
-            (Structure::Shunt(a*n), Structure::Line(b*n))
-        },
+            let n: f64 = 1.0 + a / b;
+            (Structure::Shunt(a * n), Structure::Line(b * n))
+        }
         (Structure::Line(a), Structure::Shunt(b)) => {
-            let n : f64 = 1.0 + b/a;
-            (Structure::Series(a/n), Structure::Line(b/n))
+            let n: f64 = 1.0 + b / a;
+            (Structure::Series(a / n), Structure::Line(b / n))
         }
         (Structure::Shunt(a), Structure::Line(b)) => {
-            let n : f64 = 1.0 + a/b; 
-            (Structure::Line(a/n), Structure::Series(b/n))
+            let n: f64 = 1.0 + a / b;
+            (Structure::Line(a / n), Structure::Series(b / n))
         }
         (Structure::Series(a), Structure::Line(b)) => {
-            let n : f64 = 1.0 + b/a; 
-            (Structure::Line(n*a), Structure::Shunt(n*b))
+            let n: f64 = 1.0 + b / a;
+            (Structure::Line(n * a), Structure::Shunt(n * b))
         }
         _ => (a, b),
     }
@@ -120,172 +115,96 @@ enum TransformError {
     InvalidInput,
 }
 
-fn transform_structure(input: &mut VecDeque<Structure>, _src_impedance: f64) -> Result<(), TransformError> {
+fn transform_structure(input: &[Structure], _src_impedance: f64) -> Result<Vec<Structure>, TransformError> {
     if !all_pairs_lp(input.iter().copied()) {
         return Err(TransformError::InvalidInput);
     }
 
     if input.is_empty() {
-        return Ok(());
+        return Ok(Default::default());
     }
 
-    if matches!(input.front().unwrap(), Structure::Shunt(_)) {
-        // Case 1:
-        //   We have a pattern of `LPLPLP...`
-        //   We will shift in Ds from the right one by one.
+    let shunt_count = input
+        .iter()
+        .filter(|structure| matches!(structure, Structure::Shunt(_)))
+        .count();
+    let mut goodness = vec![0.0; shunt_count];
 
-        // Invariant:
-        //   With each iteration of the loop, we will ensure that `input[..finalised]`
-        //   is in a finalised state:
-        // ```
-        // LDLDLPLP
-        // ~~~~~^
-        //      | finalised
-        // ```
-        let mut finalised = 1;
-        while finalised < input.len() {
-            // Here, we shift in a D from the right
-            // ```
-            // LDLDLPLPD
-            //        ~^
-            // LDLDLPLDL
-            //        ^~
-            // ```
-            // etc.
-            let mut line_position = input.len();
-            input.push_back(Structure::Line(1.0));
-            while line_position > finalised {
-                (input[line_position - 1], input[line_position]) =
-                    process_pair(input[line_position - 1], input[line_position]);
-                line_position -= 1;
-            }
-            // We have now changed the state of the input from something like
-            // ```
-            // LDLDLPLPD
-            //      ~~~^
-            // ```
-            // to something like
-            // ```
-            // LDLDLDLPL
-            //      ^~~~
-            // ```
-            // hence, shifting the `finalised` up by 2
-            finalised += 2;
-        }
-    } else if matches!(input.back().unwrap(), Structure::Shunt(_)) {
-        // Case 2:
-        //   We have a pattern of `...PLPLPL`
-        //   We will shift in Ds from the left one by one.
-
-        // Invariant:
-        //   With each iteration of the loop, we will ensure that `&input[finalised..]`
-        //   is in a finalised state:
-        // ```
-        // PLPLDLDL
-        //    ^~~~~
-        //    | finalised
-        // ```
-        let mut finalised = input.len() - 1;
-        while finalised > 0 {
-            // Here, we shift in a D from the left
-            // ```
-            // DPLPLDLDL
-            // ^~
-            // LDLPLDLDL
-            // ~^
-            // ```
-            // etc.
-            let mut line_position = 0;
-            input.push_front(Structure::Line(1.0));
-            // When we push a D on the left, we have to shift `finalised` up by 1
-            // ```
-            // PLPLDLDL
-            //    ^~~~~
-            //    | finalised
-            // DPLPLDLDL
-            // ^  >^~~~~
-            //     | finalised
-            // ```
-            finalised += 1;
-            while line_position + 1 < finalised {
-                (input[line_position], input[line_position + 1]) =
-                    process_pair(input[line_position], input[line_position + 1]);
-                line_position += 1;
-            }
-            // We have now changed the state of the input from something like
-            // ```
-            // DPLPLDLDL
-            // ^~~~
-            // ```
-            // to something like
-            // ```
-            // LPLDLDLDL
-            // ~~~^
-            // ```
-            // hence, shifting the `finalised` down by 2
-            finalised -= 2;
-        }
-    } else {
-        // Case 3:
-        //   We have a pattern of `PL...LP`
-        //   We will pretend the first P isn't there,
-        //   and apply the strategy of Case 1, shifting in Ds from the right one by one.
-        //   We then deal with the first P last.
-
-        // Invariant:
-        //   With each iteration of the loop, we will ensure that `input[1..finalised]`
-        //   is in a finalised state:
-        // ```
-        // PLDLDLPLP
-        //  ^~~~~^
-        //       | finalised
-        // ```
-        let mut finalised = 2;
-        while finalised < input.len() {
-            // Here, we shift in a D from the right
-            // ```
-            // PLDLDLPLPD
-            //         ~^
-            // PLDLDLPLDL
-            //         ^~
-            // ```
-            // etc.
-            let mut line_position = input.len();
-            input.push_back(Structure::Line(1.0));
-            while line_position > finalised {
-                (input[line_position - 1], input[line_position]) =
-                    process_pair(input[line_position - 1], input[line_position]);
-                line_position -= 1;
-            }
-            // We have now changed the state of the input from something like
-            // ```
-            // PLDLDLPLPD
-            //       ~~~^
-            // ```
-            // to something like
-            // ```
-            // PLDLDLDLPL
-            //       ^~~~
-            // ```
-            // hence, shifting the `finalised` up by 2
-            finalised += 2;
-        }
-        // Now, the state looks like something like
-        // ```
-        // PLDLDLDLDLDL
-        // ```
-        // We shift in a D on the left to handle the final P:
-        // ```
-        // DPLDLDLDLDLDL
-        // ^~
-        // LDLDLDLDLDLDL
-        // ~^
-        // ```
-        input.push_front(Structure::Line(1.0));
-        (input[0], input[1]) = process_pair(input[0], input[1]);
+    if shunt_count == 0 {
+        assert_eq!(input.len(), 1);
+        let (shunt, line) = process_pair(Structure::Line(1.0), *input.first().unwrap());
+        return Ok(vec![shunt, line]);
     }
 
-    Ok(())
+    let first_shunt = match input.first().unwrap() {
+        Structure::Shunt(_) => 0,
+        Structure::Series(_) => 1,
+        _ => unreachable!(),
+    };
+    let mut transformed = vec![Structure::Line(0.0); 2 * input.len() - 1];
+
+    let loop_body = |i: usize, transformed: &mut [Structure]| {
+        // initial setup
+        for (ix_input, ix_transformed) in (0..transformed.len()).step_by(2).enumerate() {
+            transformed[ix_transformed] = input[ix_input];
+        }
+
+        let cutoff_shunt = first_shunt + 2 * i;
+        // left side
+        {
+            let mut finalised = 2 * cutoff_shunt;
+            while finalised > 0 {
+                let mut line_position = 1;
+                (transformed[line_position - 1], transformed[line_position]) =
+                    process_pair(Structure::Line(1.0), transformed[line_position - 1]);
+                while line_position + 2 < finalised {
+                    (transformed[line_position + 1], transformed[line_position + 2]) =
+                        process_pair(transformed[line_position], transformed[line_position + 1]);
+                    line_position += 2;
+                }
+                finalised -= 2;
+            }
+        }
+        // right side
+        {
+            let mut finalised = 2 * cutoff_shunt;
+            while finalised < transformed.len() - 1 {
+                let mut line_position = transformed.len() - 2;
+                (transformed[line_position], transformed[line_position + 1]) =
+                    process_pair(transformed[line_position + 1], Structure::Line(1.0));
+                while finalised < line_position - 2 {
+                    (transformed[line_position - 2], transformed[line_position - 1]) =
+                        process_pair(transformed[line_position - 1], transformed[line_position]);
+                    line_position -= 2;
+                }
+                finalised += 2;
+            }
+        }
+    };
+
+    for i in 0..shunt_count {
+        loop_body(i, &mut transformed);
+
+        for &structure in &transformed {
+            goodness[i] += match structure {
+                Structure::Series(v) => v,
+                Structure::Shunt(v) => v,
+                Structure::Line(v) => v,
+                _ => unreachable!(),
+            }
+            .powf(2.0);
+        }
+    }
+
+    let best = goodness
+        .iter()
+        .enumerate()
+        .min_by(|&(_, g1), &(_, g2)| f64::total_cmp(g1, g2))
+        .map(|(i, _)| i)
+        .unwrap();
+    loop_body(best, &mut transformed);
+
+    Ok(transformed)
 }
 
 fn all_pairs_lp(iter: impl Iterator<Item = Structure>) -> bool {
