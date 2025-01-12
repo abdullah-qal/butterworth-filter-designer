@@ -38,9 +38,9 @@ fn input_generation() -> VecDeque<Structure> {
         [0.618, 1.618, 2.0, 1.618, 0.618, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], 
         [0.5176, 1.4142, 1.9318, 1.9318, 1.4142, 0.5176, 1.0, 0.0, 0.0, 0.0, 0.0],
         [0.445, 1.247, 1.8019, 2.0, 1.8019, 1.247, 0.445, 1.0, 0.0, 0.0, 0.0], 
-        [0.39, 1.111, 1.6629, 1.9615, 1.9615, 1.6629, 1.111, 0.39, 1.0, 0.0, 0.0], 
+        [0.3902, 1.111, 1.6629, 1.9615, 1.9615, 1.6629, 1.111, 0.39, 1.0, 0.0, 0.0], 
         [0.3473, 1.0, 1.5321, 1.8794, 2.0, 1.8794, 1.5321, 1.0, 0.3473, 1.0, 0.0], 
-        [0.3129, 0.908, 1.4142, 1.782, 1.9754, 1.782, 1.4142, 0.908, 0.3129, 1.0, 0.0], 
+        [0.3129, 0.908, 1.4142, 1.782, 1.9754, 1.9754, 1.7820, 1.4142, 0.9080, 0.3129, 0.0], 
     ];
 
     let selected_row = &table[number - 1];
@@ -53,7 +53,7 @@ fn input_generation() -> VecDeque<Structure> {
         if i % 2 == 0 && i != number  {
             structures.push_back(Structure::Series(value));
         } else if i % 2 != 0 && i != number  {
-            structures.push_back(Structure::Shunt(value));
+            structures.push_back(Structure::Shunt(1.0/value));
         }
         else {
             structures.push_back(Structure::Load(value));
@@ -63,9 +63,9 @@ fn input_generation() -> VecDeque<Structure> {
     println!("Element values for filter:");
     for (i, structure) in structures.iter().enumerate() {
         match structure {
-            Structure::Series(value) => println!("g{}: Series({})", i + 1, value),
-            Structure::Shunt(value) => println!("g{}: Shunt({})", i + 1, value),
-            Structure::Load(value) => println!("g{}: Load({})", i + 1, value),
+            Structure::Series(value) => println!("g{}: Series({:.4})", i + 1, value),
+            Structure::Shunt(value) => println!("g{}: Shunt({:.4})", i + 1, value),
+            Structure::Load(value) => println!("g{}: Load({:.4})", i + 1, value),
             Structure::Line(_) => println!("Unexpected line"),
         }
     }
@@ -77,17 +77,40 @@ fn main() {
     let mut input = input_generation();
     input.pop_back();
     transform_structure(&mut input, src_impedance).expect("F");
-    println!("{:?}", input);
+    println!("\n The normalised characteristic impedence of the lines are as follows:\n");
+    println!("{:.4?}", input);
+    println!("\n The actual characteristic impedence of the lines are as follows:\n");
+    let mut new_input = Vec::new();
+    for i in input {
+        match i {
+            Structure::Shunt(v) => new_input.push(Structure::Shunt(v*50.0)),
+            Structure::Line(v) => new_input.push(Structure::Line(v*50.0)),
+            _ => println!("Unexpected value"),
+        }
+    }
+    println!("{:.4?}", new_input)
 }
 
 
 
 fn process_pair(a: Structure, b: Structure) -> (Structure, Structure) {
     match (a, b) {
-        (Structure::Line(a), Structure::Series(b)) => (Structure::Shunt(b), Structure::Line(a)),
-        (Structure::Line(a), Structure::Shunt(b)) => (Structure::Series(b), Structure::Line(a)),
-        (Structure::Shunt(a), Structure::Line(b)) => (Structure::Line(b), Structure::Series(a)),
-        (Structure::Series(a), Structure::Line(b)) => (Structure::Line(b), Structure::Shunt(a)),
+        (Structure::Line(a), Structure::Series(b)) => {
+            let n : f64 = 1.0 + a/b;
+            (Structure::Shunt(a*n), Structure::Line(b*n))
+        },
+        (Structure::Line(a), Structure::Shunt(b)) => {
+            let n : f64 = 1.0 + b/a;
+            (Structure::Series(a/n), Structure::Line(b/n))
+        }
+        (Structure::Shunt(a), Structure::Line(b)) => {
+            let n : f64 = 1.0 + a/b; 
+            (Structure::Line(a/n), Structure::Series(b/n))
+        }
+        (Structure::Series(a), Structure::Line(b)) => {
+            let n : f64 = 1.0 + b/a; 
+            (Structure::Line(n*a), Structure::Shunt(n*b))
+        }
         _ => (a, b),
     }
 }
